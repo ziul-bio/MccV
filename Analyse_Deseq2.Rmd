@@ -368,87 +368,51 @@ topDE
 ```
 
 
+
+### Volcano plot Glue vs Ara
 ```{r, fig.height=5, fig.width=8}
-legen <- res_df[row.names(res_df) %in% rownames(topDE), ]
 
-volcano = ggplot(res_df, aes(log2FoldChange, -log10(pvalue))) + 
-  geom_point(aes(col=DE)) +
-  scale_color_manual(values=c("red", "blue"))
+# sig columns
+res_df$sig <- ifelse(res_df$log2FoldChange > 1 & res_df$padj < 0.05, 'UP',
+       ifelse(res_df$log2FoldChange < -1 & res_df$padj < 0.05, 'DOWN', 'Not-sig'))
 
+plot_data <- na.omit(res_df)
 
-volcano + geom_label_repel(data= legen, aes(label= row.names(legen)), size=3, box.padding = unit(2, "lines"), point.padding = unit(5, "points"), max.overlaps = 100) +
-   labs(title= "Volcano plot of Diferencial Expressed Peptides",
-       subtitle = "Comparison of Ara vs Glue",
-       x= "log2 fold change", 
-       y= "p-value (-log10)",
-       color="Differential Expressed") +
-  scale_x_continuous(limits = c(-20, 20)) +
-  theme_bw() + coord_cartesian(clip = "off")
+up = length(which(res_df$sig== 'UP'))
+down = length(which(res_df$sig== 'DOWN')) 
 
-ggsave(filename = "results/volcano_plot_one.jpeg", width = 10, height = 6, dpi = 600)
-```
+repel_data <- filter(plot_data, abs(log2FoldChange) >1.5 & padj <0.0005)
 
-
-
-### Volcano plot 10uM IPTG vs 0uM IPTG
-```{r, fig.height=5, fig.width=8}
-legen <- ten[rownames(ten) %in% rownames(topDE), ]
-
-volcano = ggplot(ten, aes(log2FoldChange, -log10(pvalue))) + 
-  geom_point(aes(col=DE)) +
-  scale_color_manual(values=c("red", "blue"))
-
-
-volcano +
-  geom_label_repel(data= legen, aes(label= row.names(legen)), size=3, box.padding = unit(3, "lines"),
-                   point.padding = unit(5, "points"), max.overlaps =100) +
-   labs(title= "Volcano plot of Diferencial Expressed Peptides",
-       subtitle = "Comparison of 10uM vs 0uM",
-       x= "log2 fold change", 
-       y= "p-value (-log10)",
-       color="Differential Expressed") +
-  scale_x_continuous(limits = c(-20, 20)) +
-  theme_bw() + coord_cartesian(clip = "off")
-
-ggsave(filename = "results/volcano_plot_ten.jpeg", width = 8, height = 5, dpi = 300)
-```
-
-
-
-## Volcano plot 100uM IPTG vs 0uM IPTG
-```{r, fig.height=5, fig.width=8}
-legen <- hnd[rownames(hnd) %in% rownames(topDE), ]
-
-
-volcano = ggplot(hnd, aes(log2FoldChange, -log10(pvalue))) + 
-  geom_point(aes(col=DE)) +
-  scale_color_manual(values=c("red", "blue"))
-
-
-volcano + 
-  geom_label_repel(data= legen, aes(label= row.names(legen)), size=3, box.padding = unit(5, "lines"),
-                   point.padding = unit(5, "points"), max.overlaps =150) +
+ggplot(data=plot_data, aes(x=log2FoldChange, y=-log10(padj))) +
+         geom_point(aes(color=sig)) +
+  scale_color_manual(values= c('blue', 'grey', 'red'))+
   
-  labs(title= "Volcano plot of Diferencial Expressed Peptides",
-       subtitle = "Comparison of 100uM vs 0uM",
-       x= "log2 fold change", 
+  labs(title = 'Diferencial Expressed Peptides',
+       subtitle = 'Comparison of Ara vs Glue',
+        x= "log2 fold change", 
        y= "p-value (-log10)",
-       color="Differential Expressed") +
-  scale_x_continuous(limits = c(-10, 8)) +
-  theme_bw() + coord_cartesian(clip = "off")
+       color="Differential Expressed",
+       ) +
+  geom_label_repel(data= legen, aes(label= row.names(legen)), size=3, box.padding = unit(2, "lines"), point.padding = unit(5, "points"), max.overlaps = 100)+
+  annotate(geom='text', x=c(-7,7), y=c(290, 290), label=c('Down', 'Up'), size=5) +
+  annotate(geom='text', x=c(-7,7), y=c(270, 270), label=c(down, up), size=5) +
+  #geom_text_repel(data=repel_data, aes(label=row.names(repel_data)), size=3) +
+  scale_x_continuous(limits = c(-10, 10)) +
+  theme_bw()
 
-ggsave(file="results/volcano_plot_hdn.jpeg", height=5, width=8, dpi=300)
+ggsave(filename = "results/volcano_plot_lo2FoldChange.jpeg", width = 10, height = 6, dpi = 600)
 ```
+
+
 
 
 
 ### Clustering genes with heatmap
-```{r, fig.height=10, fig.width=9}
-jpeg("results/pheatmap_z-score_top50DE_v01.jpeg", height=2000, width=1000, res = 120)
+```{r, fig.height=15, fig.width=12}
+jpeg("results/pheatmap_z-score_top100DE.jpeg", height=5000, width=3000, res = 300)
 
 #color pallet
-cores_heat <- colorRampPalette(brewer.pal(9, "YlOrRd"))(250)
-#cores_heat <- colorRampPalette(brewer.pal(9, "Blues"))(250)
+cores_heat <- colorRampPalette(c("blue", "white", "red"))(50)
 
 # order matrix by difference in mean variation
 tx <- order(-rowVars(rld_mtx))
@@ -458,20 +422,30 @@ mat <- rld_mtx[tx, ]
 mat <- (mat - rowMeans(mat)) / sd(mat)
 
 # Filter matrix by peptides of interest
-mat <- rld_mtx[row.names(rld_mtx) %in% rownames(topDE), ]
+#mat <- rld_mtx[row.names(rld_mtx) %in% rownames(topDE), ]
 
 # description df
 descr <- data.frame(row.names = colnames(Counts), 
-                    Group = as.factor(rep(c("0uM", "1uM", "10uM", "100um"), each=3)))
-descr$Group <- factor(descr$Group, levels = c("0uM", "1uM", "10uM", "100um"))
+                    Group = as.factor(rep(c("Glue", "Ara"), each=3)))
+descr$Group <- factor(descr$Group, levels = c("Glue", "Ara"))
 
-#Heatmap
-pheatmap(head(mat, 50), scale="row", cluster_rows=TRUE, show_rownames=TRUE,
-          show_colnames=T, cluster_cols=F, annotation_col=descr, col=cores_heat,
-         main = "The top 50 Peptides Differencial Expressed, colored by z-score")
+# Create the heatmap with rotated x-axis labels
+pheatmap(head(mat, 100), 
+         scale = "row", 
+         cluster_rows = TRUE, 
+         show_rownames = TRUE,
+         show_colnames = TRUE, 
+         cluster_cols = FALSE, 
+         annotation_col = descr, 
+         col = cores_heat,
+         main = "The top 100 Peptides Differentially Expressed, colored by z-score",
+         annotation_names_col = FALSE, # Turn off the default column names
+         angle_col = 0) # Rotate column names by x degrees
 
+dev.off()
 
 ```
+
 
 
 
